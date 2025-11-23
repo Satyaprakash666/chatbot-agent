@@ -1,0 +1,251 @@
+
+.account-menu {
+    position: relative;
+    z-index: 1000;
+}
+
+.account-button {
+    background: transparent;
+    border: none;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+}
+
+.account-button:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.account-dropdown {
+    position: absolute;
+    right: 0;
+    top: 50px;
+    background: #1f1f1f;
+    color: white;
+    width: 260px;
+    padding: 20px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: fadeIn 0.2s ease-in-out;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.30);
+    align-items: center;
+}
+
+.account-dropdown p {
+    margin: 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.account-dropdown button {
+    background: #ff3b3b;
+    color: white;
+    padding: 7px 10px;
+    width: 50%;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.account-dropdown.hidden {
+    display: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* Reset & base */
+*,
+*::before,
+*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root{
+  --bg:#0f1117;
+  --panel:#0b1220;
+  --muted: #9aa4b2;
+  --accent: #3b82f6;
+  --glass: rgba(255,255,255,0.05);
+  --fast: 0.18s ease;
+  --slow: 0.45s cubic-bezier(.2,.9,.3,1);
+}
+
+html,body { height:100%; }
+body.full-screen {
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: var(--bg);
+  color: #e8eaed;
+  overflow: hidden;
+}
+
+/* Background blobs */
+.bg-visuals{ position:fixed; inset:0; z-index:-1; pointer-events:none; }
+.blob{ position:absolute; width:720px; opacity:.18; filter:blur(36px); animation: float 22s infinite alternate ease-in-out; }
+.blob-1{ top:-120px; left:-180px; }
+.blob-2{ bottom:-120px; right:-140px; animation-duration:28s; }
+@keyframes float{ 0%{transform:translate(0,0) rotate(0);}100%{transform:translate(80px,120px) rotate(360deg);} }
+
+/* Root container */
+.chat-root{
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  width:100vw;
+  max-width:1200px;
+  margin:0 auto;
+  gap:0;
+  padding:0;
+}
+
+/* Header */
+.chat-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:18px 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  backdrop-filter: blur(6px);
+  position: relative;  /* ensure dropdown z-index works */
+  z-index: 1500; 
+}
+.brand{ display:flex; align-items:center; gap:12px; }
+.brand .avatar svg{ border-radius:50%; outline:2px solid rgba(255,255,255,0.06); }
+.brand-info strong{ font-size:1.05rem; display:block; }
+.brand-info .status{ font-size:.8rem; color:var(--muted); }
+
+/* Header actions */
+.header-actions{ display:flex; gap:10px; align-items:center; }
+.icon-btn{ background:transparent; border:none; color:var(--muted); font-size:1.1rem; cursor:pointer; padding:6px 8px; border-radius:8px; transition:var(--fast); }
+.icon-btn:hover{ background:rgba(255,255,255,0.02); color:#fff; }
+
+/* Messages area fills remaining space */
+.messages{
+  flex:1;
+  padding:26px;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  scroll-behavior:smooth;
+}
+
+/* Message bubbles */
+.message{ max-width:78%; animation:fadeUp var(--slow) both; }
+.message .meta{ font-size:.72rem; color:var(--muted); margin-bottom:6px; }
+.bubble{
+  padding:12px 14px;
+  border-radius:12px;
+  background: rgba(255,255,255,0.03);
+  color: #e8eaed;
+  line-height:1.35;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+}
+.message.user{ margin-left:auto; align-self:flex-end; }
+.message.user .bubble{
+  background: linear-gradient(90deg, #fef3c7 0%, #fb7185 100%);
+  color:#000;
+}
+
+/* Welcome / subtle bot style */
+.message.bot.welcome .bubble{ background: linear-gradient(180deg, rgba(14,165,233,0.08), rgba(59,130,246,0.04)); border:1px solid rgba(59,130,246,0.08); }
+
+/* PDF attachment bubble */
+.attachment {
+  display:inline-flex;
+  gap:10px;
+  align-items:center;
+  padding:10px 12px;
+  border-radius:12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed rgba(255,255,255,0.04);
+}
+.attachment .file-info{ display:flex; flex-direction:column; }
+.attachment .file-name{ font-weight:600; font-size:.95rem; }
+.attachment .file-meta{ font-size:.78rem; color:var(--muted); }
+
+/* Composer area */
+.composer{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  /* padding:14px 18px; */
+  padding: 14px 18px 30px 18px;
+  border-top: 1px solid rgba(255,255,255,0.03);
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,0.12));
+}
+.composer-left{ display:flex; gap:10px; align-items:center; flex:1; }
+.tool-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:44px;
+  height:44px;
+  border-radius:10px;
+  border:none;
+  cursor:pointer;
+  background:var(--glass);
+  color:#fff;
+  font-size:1.1rem;
+  transition: transform var(--fast);
+}
+.tool-btn:hover{ transform:translateY(-3px); background:rgba(255,255,255,0.03); }
+
+.input{
+  flex:1;
+  padding:12px 14px;
+  border-radius:10px;
+  border:none;
+  background: rgba(0,0,0,0.45);
+  color:#fff;
+  outline:none;
+  font-size:1rem;
+  min-width:120px;
+}
+
+/* Send button */
+.btn-send{
+  padding:10px 14px;
+  border-radius:10px;
+  border:none;
+  background:var(--accent);
+  color:#000;
+  font-weight:700;
+  cursor:pointer;
+  transition:filter var(--fast), transform var(--fast);
+}
+.btn-send:hover{ filter:brightness(1.05); transform:translateY(-2px); }
+
+/* Typing indicator */
+.typing {
+  display:inline-flex;
+  gap:6px;
+  align-items:center;
+}
+.typing .dot{
+  width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.7);
+  opacity:0.6; animation: blink 1s infinite;
+}
+.typing .dot:nth-child(2){ animation-delay: .15s; }
+.typing .dot:nth-child(3){ animation-delay: .3s; }
+@keyframes blink{ 0%,80%,100%{ transform:translateY(0); opacity:.25 } 40%{ transform:translateY(-6px); opacity:1 } }
+
+/* Animations */
+@keyframes fadeUp{ from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:translateY(0);} }
+
+/* Responsive */
+@media (max-width:760px){
+  .chat-root{ max-width:100%; }
+  .messages{ padding:16px; }
+  .composer{ padding:12px; }
+  .tool-btn{ width:40px; height:40px; }
+}

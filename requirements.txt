@@ -1,7 +1,6 @@
 # PyTorch CPU-only wheel source
 -f https://download.pytorch.org/whl/cpu/torch_stable.html
 
-# Packages
 flask==3.1.2
 flask-cors==6.0.1
 pymongo==4.15.4
@@ -9,10 +8,9 @@ python-dotenv==1.2.1
 groq==0.36.0
 pdfplumber==0.11.8
 transformers==4.57.1
-torch==2.9.0+cpu
+torch==2.9.1
 faiss-cpu==1.13.0
 google-api-python-client==2.187.0
 google-auth==2.41.1
 google-auth-httplib2==0.2.1
 google-auth-oauthlib==1.2.3
-

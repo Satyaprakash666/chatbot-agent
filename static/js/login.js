@@ -133,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
             showAlert("Sign in successful!", "success");
-            setTimeout(() => window.location.href = "https://chatbot-agent-t22h.onrender.com//home", 500);
+            setTimeout(() => window.location.href = "https://chatbot-agent-t22h.onrender.com/home", 500);
         } catch (error) {
             let msg = "Sign-in failed: " + error.message;
             try {
@@ -168,3 +168,4 @@ document.addEventListener("DOMContentLoaded", () => {
         if (user) setTimeout(() => window.location.href = "https://chatbot-agent-t22h.onrender.com/home", 1000);
     });
 });
+

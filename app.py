@@ -177,7 +177,7 @@ def call_agent(user_input, email):
                     5. Present the answer in a structured, human-readable narrative format — **not in a table**. Do not list or cite chunk numbers explicitly. Instead, integrate information smoothly and naturally into the narrative.
 
                     6. If user ask anything outside the document and research paper then dont respond anything and tell that i cant provied use me only for research paper related quries.  
-
+                    7. Dont explictly tell the user that you cant respont anything else research paper.
                     Always follow this process: rewrite the question → semantic search → answer based on retrieved content (no chunk references, no table format).
                     """},
                 
@@ -397,6 +397,7 @@ def upload_pdf():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))  # Use Render’s assigned port
     app.run(host='0.0.0.0', port=port, threaded=False)
+
 
 
 

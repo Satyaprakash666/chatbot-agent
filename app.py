@@ -51,7 +51,7 @@ def mean_pooling(model_output, attention_mask):
     input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
     return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
-def create_chunks(pdf_path, email):
+def create_chunks(file, email):
     global chunks, sentence_embeddings, faiss_index, chk_max
 
     chunks[email] = []
@@ -59,7 +59,7 @@ def create_chunks(pdf_path, email):
     faiss_index[email] = None
 
     text = ""
-    with pdfplumber.open(pdf_path) as pdf:
+    with pdfplumber.open(file) as pdf:
         for page in pdf.pages:
             text += page.extract_text() or ""
 
@@ -386,12 +386,8 @@ def upload_pdf():
     if not email or not file:
         return jsonify({"error": "Email and PDF file required"}), 400
 
-    # Use /tmp for temporary storage
-    tmp_path = os.path.join("/tmp", f"{email}_{file.filename}")
-    file.save(tmp_path)
-
     try:
-        create_chunks(tmp_path, email)
+        create_chunks(file, email)
     except Exception as e:
         return jsonify({"error": f"Failed to process PDF: {str(e)}"}), 500
     
@@ -401,6 +397,7 @@ def upload_pdf():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))  # Use Render’s assigned port
     app.run(host='0.0.0.0', port=port, threaded=False)
+
 
 
 

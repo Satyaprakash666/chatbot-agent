@@ -123,7 +123,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="file-name">${file.name}</div>
                     <div class="file-meta">${(file.size / 1024 / 1024).toFixed(2)} MB — PDF</div>
                 </div>
-                <a href="${URL.createObjectURL(file)}" target="_blank" rel="noopener noreferrer">Open</a>
             </div>
         `;
 
@@ -228,3 +227,4 @@ document.addEventListener("DOMContentLoaded", () => {
         createMessageElement("The chat has been cleared. You may continue again.", false, getTimeHM());
     });
 });
+

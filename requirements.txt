@@ -27,3 +27,5 @@ pillow==12.1.1
 pydantic==2.12.5
 tqdm==4.67.3
 regex==2026.2.28
+
+pymongo==4.7.3

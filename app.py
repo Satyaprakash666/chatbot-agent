@@ -7,7 +7,9 @@ from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from dotenv import load_dotenv
-
+import os
+import firebase_admin
+from firebase_admin import credentials, auth
 from groq import Groq
 import pdfplumber
 from transformers import AutoTokenizer, AutoModel
@@ -15,20 +17,16 @@ import torch
 import torch.nn.functional as F
 import faiss
 
-
 app = Flask(__name__)
 CORS(app)
 load_dotenv()
 
-MONGO_URI = os.environ.get("MONGO_URI")
+
+MONGO_URI = os.environ.get("MONGO_URI") # changed
 TOKEN_JSON = os.environ.get("GMAIL_TOKEN_JSON")
+FIREBASE_ADMIN_JSON = os.environ.get("FIREBASE_SERVICE_ACCOUNT")
+
 SCOPES = ['https://www.googleapis.com/auth/gmail.send']
-
-
-client_db = MongoClient(MONGO_URI)
-db = client_db['help_for_farmer']
-
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 
 otp_storage = {}
@@ -41,6 +39,31 @@ sentence_embeddings = {}
 faiss_index = {}
 chk_max = {}
 
+firebase_ready = False
+
+
+
+
+client2 = MongoClient(MONGO_URI)
+db = client2["chat_bot_database"]
+
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+
+if FIREBASE_ADMIN_JSON:
+    try:
+        service_account_info = json.loads(FIREBASE_ADMIN_JSON)
+        fire_cred = credentials.Certificate(service_account_info)
+        firebase_admin.initialize_app(fire_cred)
+        firebase_ready = True
+        print("✅ Firebase Admin connected.")
+    except Exception as e:
+        print(f"⚠️ Firebase initialization failed: {e}")
+else:
+    print("⚠️ Warning: FIREBASE_SERVICE_ACCOUNT not found. Auth features will be disabled.")
+
+
+
 
 model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
 tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
@@ -51,7 +74,7 @@ def mean_pooling(model_output, attention_mask):
     input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
     return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
-def create_chunks(file, email):
+def create_chunks(pdf_path, email):
     global chunks, sentence_embeddings, faiss_index, chk_max
 
     chunks[email] = []
@@ -59,10 +82,10 @@ def create_chunks(file, email):
     faiss_index[email] = None
 
     text = ""
-    with pdfplumber.open(file) as pdf:
+    with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             text += page.extract_text() or ""
-
+    
     words = text.split()
     max_words = 150
     for i in range(0, len(words), max_words):
@@ -76,11 +99,12 @@ def create_chunks(file, email):
     sentence_embeddings[email] = mean_pooling(model_output, encoded_input['attention_mask'])
     sentence_embeddings[email] = F.normalize(sentence_embeddings[email], p=2, dim=1)
     chk_max[email] = len(sentence_embeddings[email])
-
+    
     embeddings_np = sentence_embeddings[email].cpu().numpy().astype('float32')
     dimension = embeddings_np.shape[1]
     faiss_index[email] = faiss.IndexFlatL2(dimension)
     faiss_index[email].add(embeddings_np)
+    
     print(f"FAISS index built with {faiss_index[email].ntotal} vectors for {email}")
     
 
@@ -145,11 +169,8 @@ def call_agent(user_input, email):
     num_chunks = chk_max.get(email, 0)
     # print(f"------------------------------------------- {num_chunks}")
 
-    # Add last few messages to memory
-    # if len(ques_ans[email]) >= 4:
-    #     memory[email].extend(ques_ans[email][-4:])
-    if len(ques_ans[email]) >= 2:
-        memory[email].extend(ques_ans[email][-2:])
+    
+    memory[email] = ques_ans[email][-8:]
 
     memory[email].append({"role": "user", "content": user_input})
     ques_ans[email].append({"role": "user", "content": user_input})
@@ -157,30 +178,22 @@ def call_agent(user_input, email):
     while True:
         chat = client.chat.completions.create(
             messages=[
-                # {"role": "system", "content": "You are a research paper analysis assistant. you already have the document uploaded and processed. You have following tools to use : 1. budget - to get the remaining balance in the bank account , 2. rewrite_question - to rewrite user question into a detailed for better semantic-search , 3. semantic_search - to perform semantic search using FAISS , 4. answer_ques - to answer user question based on the retrieved context from semantic search ."},
                 {"role": "system", "content": 
-                # f"""You are a Research Paper Analysis Assistant. A PDF document has already been uploaded and processed, and its content is stored in a database as semantic embeddings. Whenever a user asks a question about the document, first carefully read the query and, if it is vague or general, rewrite it into a detailed and precise version suitable for semantic search using the rewrite_question tool. Use this rewritten question to perform a semantic search in the database and retrieve the most relevant chunks, up to a maximum of {str(min(10, chk_max))}, using the semantic_search tool. Then, take the original user question along with the retrieved chunks as context and generate a clear, concise, and accurate answer directly with the main model, ensuring that all information is grounded strictly in the retrieved chunks without hallucination or adding external content. Present the answer in a structured, professional, and human-readable format, combining multiple relevant chunks logically if needed, and indicate references or source chunks where appropriate. Always follow this process: rewrite the question, perform semantic search, and answer based on the retrieved content."""},
                 f"""
-                    You are a Research Paper Analysis Assistant. A PDF document has already been uploaded and processed, and its content is stored in a database as semantic embeddings. Whenever a user asks a question about the document, follow these steps:
-
+                    You are a Research Paper Analysis Assistant created by Satya Prakash. A PDF document has already been uploaded and processed, and its content is stored in a database as semantic embeddings. Whenever a user asks a question about the document, follow these steps:
                     1. Carefully read the user query. If the question is vague, general, or short, rewrite it into a detailed and precise version suitable for semantic search using the rewrite_question tool.
-
                     2. Perform semantic search in the database using the rewritten question. Choose the number of top relevant chunks (`top_k`) based on the complexity and specificity of the question:
                     - Use a smaller `top_k` for very specific questions (e.g., 3–5 chunks).
                     - Use a larger `top_k` for broad or general questions (e.g., up to {min(5, num_chunks)} chunks).
                     - If `top_k` is 0, assume the user has not uploaded a document yet.
-
                     3. Retrieve the most relevant chunks up to the chosen `top_k`.
-
                     4. Take the original user question along with the retrieved chunks as context and generate a clear, concise, and accurate answer directly with the main model. Ensure that all information is strictly grounded in the retrieved chunks, without hallucination or external content.
-
                     5. Present the answer in a structured, human-readable narrative format — **not in a table**. Do not list or cite chunk numbers explicitly. Instead, integrate information smoothly and naturally into the narrative.
-
-                    6. If user ask anything outside the document and research paper then dont respond anything and tell that i cant provied use me only for research paper related quries.  
+                    6. 6. If user ask anything outside the document and research paper then dont respond anything and tell that i cant provied use me only for research paper related quries.  
                     7. Dont explictly tell the user that you cant respont anything else research paper.
                     Always follow this process: rewrite the question → semantic search → answer based on retrieved content (no chunk references, no table format).
                     """},
-                
+                    
                 *memory[email]
             ],
             model="openai/gpt-oss-120b",
@@ -243,7 +256,18 @@ def call_agent(user_input, email):
             stream=False
         )
         msg = chat.choices[0].message
-        memory[email].append(msg)
+
+        if msg.tool_calls:
+            memory[email].append({
+                "role": "assistant",
+                "content": msg.content or "",
+                "tool_calls": msg.tool_calls
+            })
+        else:
+            memory[email].append({
+                "role": "assistant",
+                "content": msg.content or ""
+            })
 
         if not msg.tool_calls:
             ques_ans[email].append({"role": "assistant", "content": msg.content})
@@ -266,39 +290,140 @@ def call_agent(user_input, email):
             else:
                 result = f"Unknown tool: {tool_name}"
 
-            memory[email].append({"role": "tool","content": result,"tool_call_id": tool.id})
+            memory[email].append({
+                "role": "tool",
+                "tool_call_id": tool.id,
+                "name": tool_name,
+                "content": result
+            })
 
 
-
-# ----------------- Gmail -----------------
 def get_gmail_service():
-    creds = None
-    if TOKEN_JSON:
-        creds = Credentials.from_authorized_user_info(json.loads(TOKEN_JSON), SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+    if not TOKEN_JSON:
+        raise Exception("GMAIL_TOKEN_JSON is missing in environment variables")
     
-    service = build('gmail', 'v1', credentials=creds)
-    return service
+    creds_data = json.loads(TOKEN_JSON)
+    creds = Credentials.from_authorized_user_info(creds_data, SCOPES)
+
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(Request())
+        except Exception as e:
+            raise Exception("Refresh token invalid. Regenerate GMAIL_TOKEN_JSON.") from e
+        
+    if not creds.valid:
+        raise Exception("Gmail credentials are invalid.")
+
+    return build('gmail', 'v1', credentials=creds)
+
+
 
 def send_otp(service, email, otp, name):
-    subject = "Your Chatbot OTP Verification"
+    subject = "Verify Your Chatbot Account - Your OTP Inside"
     body = f"""
-    <p>Hello {name},</p>
-    <p>Thank you for using our Chatbot service. Your OTP for verification is: <strong>{otp}</strong></p>
-    <p>Please enter this OTP to continue your chat session.</p>
-    <p>— Team ChatBot </p>
-    """
+<html>
+<head>
+<style>
+    body {{
+        font-family: 'Arial', sans-serif;
+        color: #333;
+        background-color: #f9f9f9;
+        margin: 0;
+        padding: 0;
+    }}
+    .container {{
+        max-width: 600px;
+        margin: 30px auto;
+        background-color: #ffffff;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }}
+    h2 {{
+        color: #1a1a1a;
+        text-align: center;
+        font-size: 28px;
+        margin: 20px 0;
+        letter-spacing: 1px;
+    }}
+    p {{
+        font-size: 16px;
+        line-height: 1.6;
+    }}
+    .otp-box {{
+        background-color: #f1f5f9;
+        padding: 15px;
+        text-align: center;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 24px;
+        letter-spacing: 2px;
+        margin: 20px 0;
+        color: #1a1a1a;
+    }}
+    .btn {{
+        display: inline-block;
+        background-color: #1a73e8;
+        color: #ffffff !important;
+        text-decoration: none;
+        padding: 12px 24px;
+        border-radius: 5px;
+        font-weight: 600;
+        margin-top: 20px;
+    }}
+    hr {{
+        border: none;
+        border-top: 1px solid #e0e0e0;
+        margin: 30px 0;
+    }}
+    .footer {{
+        font-size: 14px;
+        color: #666666;
+        text-align: center;
+        margin-top: 20px;
+    }}
+</style>
+</head>
+<body>
+    <div class="container">
+        <p>Hello <strong>{name}</strong>,</p>
+
+        <p>Thank you for signing up for our Chatbot service!<br>
+        We're excited to have you on board.<br>
+        To complete your registration and secure your account, please use the One-Time Password (OTP) below:</p>
+
+        <div class="otp-box">{otp}</div>
+
+        <p>This OTP is valid for <strong>5 minutes</strong>. Do not share it with anyone.<br>
+        Enter it promptly to activate your account and start using all the features of the Chatbot.</p>
+
+        <a href="#" class="btn">Verify Account</a>
+
+        <hr>
+
+        <p>If you did not sign up, you can safely ignore this email.</p>
+        <hr>
+        <div class="footer">
+            <p>Need help? Contact us at: <strong>satyasp3466@gmail.com</strong></p>
+            <p>Thank you,<br>
+            <strong>Chatbot Security Team</strong><br>
+            🌐 <a href="https://yourchatbotproject.com">Visit Chatbot</a></p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+    
     message = MIMEText(body, "html")
     message['to'] = email
     message['subject'] = subject
+
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     return service.users().messages().send(userId="me", body={'raw': raw}).execute()
 
 
-# ----------------- Routes -----------------
+
+
 @app.route('/')
 @app.route('/login')
 def login_page():
@@ -308,41 +433,145 @@ def login_page():
 def index():
     return render_template('chat.html') 
 
+
 @app.route('/send-otp', methods=['POST'])
 def send_otp_route():
     data = request.get_json()
-    email, name = data.get('email'), data.get('name')
-    if not email or not name:
-        return jsonify({"error": "Name and Email are required"}), 400
+    email = data.get('email')
+    name = data.get('name')
+
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    try:
+        is_user = auth.get_user_by_email(email)
+        return jsonify({"error": "Email is already registered. Please login instead."}), 400
+    except auth.UserNotFoundError:
+        # Email not registered, continue
+        pass
+    except Exception as e:
+
+        if "Malformed email address" in str(e):
+            return jsonify({
+                "error": "The email address format is incorrect. Please enter a valid email address.",
+                "errorCode": "invalid-email"
+            }), 400
+        
+        return jsonify({"error": e}), 500
+
     otp = str(random.randint(100000, 999999))
-    otp_storage[email] = otp
-    send_otp(get_gmail_service(), email, otp, name)
-    return jsonify({"message": "OTP sent successfully"})
+
+    try:
+        service = get_gmail_service()  
+        send_otp(service, email, otp, name)
+        otp_storage[email.lower()] = otp
+
+        return jsonify({"message": "✅ OTP sent successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": "OTP could not be sent at the moment. Please try again later."}), 500
+    
 
 @app.route('/verify-otp', methods=['POST'])
 def verify_otp():
     data = request.get_json()
-    email, otp = data.get('email'), data.get('otp')
-    if otp_storage.get(email) == otp:
-        del otp_storage[email]
+    email = data.get('email')
+    otp = data.get('otp')
+    if not email or not otp:
+        return jsonify({"error": "Email and OTP required"}), 400
+    stored_otp = otp_storage.get(email.lower())
+    if otp == stored_otp:
         return jsonify({"message": "OTP verified"}), 200
     return jsonify({"error": "Invalid OTP"}), 400
 
+
+@app.route('/register', methods=['POST'])
+def register_user_with_otp():
+    try:
+        data = request.json
+        email = data.get('email')
+        name = data.get('name')
+        password = data.get('password')
+        otp = data.get('otp')
+
+        if not all([email, name, password, otp]):
+            return jsonify({"error": "All fields are required", "errorCode": "missing-fields"}), 400
+
+        stored_otp = otp_storage.get(email.lower())
+        if not stored_otp or str(otp).strip() != str(stored_otp).strip():
+            return jsonify({"error": "OTP is invalid or expired", "errorCode": "invalid-otp"}), 400
+
+        try:
+            user_record = auth.create_user(
+                email=email,
+                password=password,
+                display_name=name
+            )
+        except Exception as e:
+            msg_lower = str(e).lower()
+            error_code = "firebase-error"
+
+            if "already exists" in msg_lower:
+                error_code = "user-exists"
+            elif "invalid email" in msg_lower:
+                error_code = "invalid-email"
+            elif "password must be a" in msg_lower or "weak password" in msg_lower:
+                error_code = "weak-password"
+            elif "operation not allowed" in msg_lower:
+                error_code = "operation-not-allowed"
+            print(str(e))
+
+            return jsonify({"errorCode": error_code}), 400
+
+        del otp_storage[email.lower()]
+        store_resp = store_user(email=email, name=name)
+
+        response = {
+            "message": "User created successfully",
+            "email": user_record.email,
+            "name": user_record.display_name,
+        }
+
+        return jsonify(response)
+
+    except Exception as e:
+        return jsonify({"error": str(e), "errorCode": "server-error"}), 500
+
+
 @app.route('/store_user', methods=['POST'])
-def store_user():
-    data = request.json
-    email, name = data.get('email'), data.get('name')
-    if not email or not name:
-        return jsonify({'error': 'Email and name required'}), 400
-    if db.user.find_one({'email': email}):
-        return jsonify({'error': 'User already exists'}), 400
-    db.user.insert_one({'email': email, 'name': name})
-    return jsonify({'message': 'User stored successfully'}), 200
+def store_user(email=None, name=None):
+    try:
+        # If email and name are not provided as arguments, read from request.json
+        if email is None or name is None:
+            data = request.json
+            email = data.get('email')
+            name = data.get('name')
+
+        if not email or not name:
+            return jsonify({'error': 'Email and name are required'}), 400
+
+        result = db.user.update_one(
+            {'email': email},          # filter
+            {'$set': {'name': name}},  # update
+            upsert=True                # insert if not exists
+        )
+
+        if result.matched_count > 0:
+            message = 'User updated successfully'
+        else:
+            message = 'User created successfully'
+
+        return jsonify({'message': message}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/get_user', methods=['POST'])
 def get_user():
     email = request.json.get('email')
-    user = db.user.find_one({'email': email})
+    if not email:
+            return jsonify({'error': 'Email is required'}), 400
+    user = db.users.find_one({'email': email})
     if user:
         return jsonify({'name': user['name'], 'email': user['email']}), 200
     return jsonify({'error': 'User not found'}), 404
@@ -386,8 +615,11 @@ def upload_pdf():
     if not email or not file:
         return jsonify({"error": "Email and PDF file required"}), 400
 
+    pdf_path = os.path.join("uploads", f"{email}_{file.filename}")
+    os.makedirs("uploads", exist_ok=True)
+    file.save(pdf_path)
     try:
-        create_chunks(file, email)
+        create_chunks(pdf_path, email)
     except Exception as e:
         return jsonify({"error": f"Failed to process PDF: {str(e)}"}), 500
     
@@ -395,11 +627,4 @@ def upload_pdf():
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  # Use Render’s assigned port
-    app.run(host='0.0.0.0', port=port, threaded=False)
-
-
-
-
-
-
+    app.run(port=5000, debug=True)

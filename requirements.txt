@@ -1,21 +1,29 @@
-# CPU-only PyTorch wheel source
--f https://download.pytorch.org/whl/cpu/torch_stable.html
+Flask==3.0.3
+Flask-Cors==4.0.1
 
-flask==3.1.2
-flask-cors==6.0.1
-pymongo==4.15.4
-python-dotenv==1.2.1
-groq==0.36.0
-pdfplumber==0.11.8
-transformers==4.57.1
-torch==2.2.2+cpu   # CPU-only compatible version
-faiss-cpu==1.13.0
-google-api-python-client==2.187.0
-google-auth==2.41.1
-google-auth-httplib2==0.2.1
-google-auth-oauthlib==1.2.3
+firebase_admin==7.2.0
+google-auth==2.29.0
+google-api-python-client==2.125.0
+
+groq>=0.11.0
+
+python-dotenv==1.0.1
+requests==2.32.5
+
 numpy==1.26.4
+torch==2.2.2
+transformers==4.41.2
+tokenizers==0.19.1
+huggingface_hub==0.36.2
+safetensors==0.7.0
 
+faiss-cpu==1.7.4
 
+pdfminer.six==20231228
+pdfplumber==0.11.0
+pypdfium2==5.6.0
+pillow==12.1.1
 
-
+pydantic==2.12.5
+tqdm==4.67.3
+regex==2026.2.28

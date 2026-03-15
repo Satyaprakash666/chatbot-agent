@@ -1,5 +1,5 @@
-// const rootUrl = 'https://helpforfarmer.onrender.com';
-const rootUrl = '';
+// const rootUrl = 'https://chatbot-agent-t22h.onrender.com';
+// const rootUrl = '';
 
 
 const container = document.getElementById('container');

@@ -64,14 +64,16 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("user-name-display").innerText =
                 user.displayName?.split(" ")[0] || "Account";
         } else {
-            window.location.href = "/";
+            // LINK HERE
+            window.location.href = `${rootUrl}`;
         }
     });
 
     if (logoutBtn) {
         logoutBtn.addEventListener("click", () => {
             auth.signOut()
-                .then(() => window.location.href = "/")
+                // LINK HERE
+                .then(() => window.location.href = `${rootUrl}/`)
                 .catch((err) => console.error("Logout error:", err));
         });
     }
@@ -137,7 +139,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function sendQuestionToServer(question) {
         if (!currentUserEmail) return;
-        fetch("/ask", {
+        // LINK HERE
+        fetch(`${rootUrl}/ask`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: currentUserEmail, question })
@@ -185,7 +188,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const formData = new FormData();
             formData.append("email", currentUserEmail);
             formData.append("file", file);
-            fetch("/pdf", {
+            // LINK HERE
+            fetch(`${rootUrl}/pdf`, {
                 method: "POST",
                 body: formData
             }).then(res => res.json())
@@ -202,7 +206,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     closeBtn.addEventListener("click", () => {
         if (!currentUserEmail) return;
-        fetch("/close", {
+        // LINK HERE
+        fetch(`${rootUrl}/close`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: currentUserEmail })

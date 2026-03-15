@@ -1,4 +1,7 @@
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const rootUrl = 'https://chatbot-agent-t22h.onrender.com';
+// const rootUrl = ''
+
 const firebaseConfig = {
   apiKey: "AIzaSyCZnohyh3EPHHBCv88l96ddKFcFvHDv7Eo",
   authDomain: "chat-bot-cea01.firebaseapp.com",
@@ -31,12 +34,14 @@ firebase.auth().onAuthStateChanged((user) => {
 
     if (user) {
         if (!currentPath.includes('home')) {
-            window.location.href = "/home";
+            // LINK HERE
+            window.location.href = `${rootUrl}/home`;
         }
     } else {
         console.log("User is signed out");
         if (!currentPath.includes('')) {
-            window.location.href = "/login";
+            // LINK HERE
+            window.location.href = `${rootUrl}/login`;
         }
     }
 });
